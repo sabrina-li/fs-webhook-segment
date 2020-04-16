@@ -13,15 +13,18 @@ export const webHookListener = functions.https.onRequest(async (request, respons
     const data = JSON.stringify(request.body);
     const fsSignatureHeader = request.header("FullStory-Signature");
 
-    const signatureValid = checkHmac(fsSignatureHeader, data);
-    if(!signatureValid) {response.sendStatus(401); return;}
-
     try{
-        const res:Response = await sendToSegment(request);
-        response.send(res.json());
+        if(!checkHmac(fsSignatureHeader, data)) {
+            response.sendStatus(401); 
+            return;
+        }
+        await sendToSegment(request);
     }catch(error){
-        response.sendStatus(500)
+        console.error(error);
+        response.sendStatus(500);
     }
+
+    response.sendStatus(200);
 });
 
 
@@ -61,13 +64,13 @@ const checkHmac = (signature:string|undefined, data:string) =>{
 
 const calculateHMAC = (data:string,orgId:string,timestamp:string)=>{
     //TODO: veryfy time stamp
-    
+
     //your shared secret from FS
     const key = functions.config().fullstory.key;
     const payload:string = data + ':' + orgId + ':' + timestamp;
     const hmac = crypto.createHmac('sha256', key)
     .update(payload)
     .digest('base64')
- 
+
     return hmac;
 }
